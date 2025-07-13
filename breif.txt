@@ -1,0 +1,295 @@
+Project Description: Self-Hosted Battery Monitor Web Application (Next.js Focus)
+This project aims to build a comprehensive, self-hosted web application for monitoring a battery system via an Arduino microcontroller. The system will focus on displaying real-time data visualization and historical data logging.
+
+Key Requirements & Design Principles:
+
+Next.js Centric: The entire web application (frontend UI, API endpoints, and database interaction logic) will be built within a single Next.js project using the App Router.
+
+TypeScript: All code will be written in TypeScript for enhanced type safety and developer experience.
+
+Tailwind CSS: Styling will be handled using Tailwind CSS for rapid and consistent UI development.
+
+SQLite with Prisma: SQLite will serve as the database, with Prisma ORM for database schema definition, migrations, and interaction.
+
+Real-time Updates: WebSocket communication (socket.io) will be used to push real-time sensor data updates from the server to the client dashboard.
+
+Normalized Sensor Data: Sensor readings will be stored in a normalized way, distinguishing between voltage and current (amp) sources.
+
+Single Device Focus: The system is designed for a single Arduino device; therefore, a dedicated Device table is not required.
+
+No Arduino Command Module (for now): The initial scope for Arduino control commands (sending commands to the Arduino via API response) is deferred for future implementation. The API response to the Arduino will be a simple acknowledgment.
+
+1. Core Functionality:
+
+API Ingestion: A Next.js API endpoint will receive periodic HTTP POST requests from an Arduino, containing sensor readings for various defined voltage and amp sources. The JSON body for these readings will be minified to reduce payload size. The API will respond with a simple acknowledgment.
+
+Data Storage: All received sensor data (voltages and currents) will be stored in a PostgreSQL database using a normalized schema.
+
+Real-time Dashboard: A web-based dashboard will display the latest voltage and current readings from all configured sources in real-time, updated via WebSockets.
+
+Historical Data Visualization Page: A dedicated page will present interactive graphs showing historical trends of individual voltage sources, individual amp sources, total battery in/out amps, and overall battery level (derived from voltage or State of Charge).
+
+Sensor Source Management Page: A dedicated page will list all configured voltmeter and ammeter sources, showing their names, IDs, units, and custom location and pins information for easy reference and troubleshooting.
+
+2. Technology Stack:
+
+Frontend & Backend (Full-Stack Framework): Next.js (App Router).
+
+Language: TypeScript.
+
+Styling: Tailwind CSS.
+Database: PostgreSQL.
+
+ORM: Prisma.
+
+Real-time Communication: socket.io (for WebSocket server and client).
+
+Charting Library: Chart.js with react-chartjs-2 for interactive data visualization.
+
+3. Detailed Features & Structure:
+
+3.1. Database Schema (SQLite with Prisma Definitions):
+
+The schema prioritizes clear separation of sensor definitions from their actual readings, proper prefixing for columns, and the requested additional metadata fields. All table names will be separated by underscores.
+
+voltmeter_source table: Defines each unique voltage measurement point.
+
+vs_id (String - UUID, PRIMARY KEY, @id @default(uuid())): Unique ID for the voltmeter source.
+
+vs_name (String, @unique): User-friendly name (e.g., "Battery Voltage", "Solar Panel 1 Voltage").
+
+vs_unit (String, @default("V")): Unit of measurement (e.g., "V", "mV").
+
+vs_location (String, NULLABLE): Free text field for physical location (e.g., "Battery Box", "Roof").
+
+vs_pins (String, NULLABLE): Free text field for associated Arduino pins (e.g., "A0, A1").
+
+ammeter_source table: Defines each unique current measurement point.
+
+as_id (String - UUID, PRIMARY KEY, @id @default(uuid())): Unique ID for the ammeter source.
+
+as_name (String, @unique): User-friendly name (e.g., "Solar Panel 1 Amps", "Total In Amps", "Total Out Amps").
+
+as_unit (String, @default("A")): Unit of measurement (e.g., "A", "mA").
+
+as_location (String, NULLABLE): Free text field for physical location (e.g., "Charge Controller", "Shunt").
+
+as_pins (String, NULLABLE): Free text field for associated Arduino pins (e.g., "D5, A3").
+
+voltage_reading table: Stores individual voltage sensor readings.
+
+vr_id (Int, PRIMARY KEY, @id @default(autoincrement())): Unique reading ID.
+
+vr_source_id (String): Foreign key to voltmeter_source.vs_id.
+
+vr_timestamp (DateTime, @default(now())): When the reading was recorded by the server.
+
+vr_value (Float): The numeric voltage value.
+
+current_reading table: Stores individual current sensor readings.
+
+cr_id (Int, PRIMARY KEY, @id @default(autoincrement())): Unique reading ID.
+
+cr_source_id (String): Foreign key to ammeter_source.as_id.
+
+cr_timestamp (DateTime, @default(now())): When the reading was recorded by the server.
+
+cr_value (Float): The numeric current value.
+
+(Optional Future Considerations for Schema: battery_state_of_charge table if SoC is calculated/reported separately and temperature_reading if temperature is monitored.)
+
+3.2. Next.js Application Structure (App Router, TypeScript, Tailwind CSS):
+
+app/ directory:
+
+layout.tsx: Root layout with global styling (Tailwind CSS setup). Includes <html>, <body>, basic navigation. Wraps content with a WebSocketProvider for client-side access to socket.io.
+
+page.tsx: Dashboard Page. This will be a client component ('use client').
+
+Displays the latest readings for all defined voltmeter and ammeter sources using RealtimeSensorDisplay components.
+
+Uses WebSockets (socket.io-client) to receive and display real-time updates of sensor data.
+
+history/page.tsx: Historical Data Page. Also a client component ('use client').
+
+Contains interactive charts using Chart.js (react-chartjs-2).
+
+Graphs to include:
+
+Individual Voltmeter Sources: Line graph for each voltmeter_source's historical voltage_reading.
+
+Individual Ammeter Sources: Line graph for each ammeter_source's historical current_reading (e.g., Solar Panel 1 Amps).
+
+Total Battery In/Out Amps: A combined line graph showing CURRENT_TOTAL_IN and CURRENT_TOTAL_OUT from ammeter_sources.
+
+Battery Level (Derived): A line graph showing VOLTAGE (from a specific voltmeter_source) or STATE_OF_CHARGE (if implemented later) to represent battery level.
+
+Filtering options (e.g., "Last 24 hours", "Last 7 days", custom date range) to fetch data from API routes.
+
+sources/page.tsx: Sensor Source Management Page. This will be a server component (or client if interaction for editing/adding is desired, but for just viewing, server is sufficient).
+
+Fetches lists of voltmeter_sources and ammeter_sources from dedicated API routes.
+
+Displays these sources in clear, tabular format, showing id, name, unit, location, and pins for each.
+
+api/ directory:
+
+sensor-data/route.ts:
+
+Handles POST requests from the Arduino.
+
+Expected MINIFIED JSON body: {"V":[{"s":"<uuid>", "v":12.5}], "A":[{"s":"<uuid>", "v":3.2}]}
+
+V: Array of voltage readings. Each object: s (source ID - string UUID), v (value - number).
+
+A: Array of current (amp) readings. Each object: s (source ID - string UUID), v (value - number).
+
+Parses and validates the minified incoming data.
+
+Maps minified data to full voltage_reading and current_reading schemas.
+
+Inserts new voltage_reading records and current_reading records into the database (using Prisma createMany for efficiency).
+
+Responds to the Arduino with a simple JSON acknowledgment (e.g., {"status": "success"}).
+
+Pushes the latest sensor data (e.g., current voltage, total amps - potentially denormalized for easier client-side consumption) to connected WebSocket clients via socket.io.
+
+data/history/route.ts:
+
+Handles GET requests from the frontend for historical data for the history page.
+
+Accepts query parameters for sourceId (optional, for specific charts), type (e.g., 'voltage', 'current'), startTime, endTime, interval (e.g., 'hour', 'day' for aggregation).
+
+Queries voltage_reading or current_reading tables based on parameters.
+
+Performs server-side aggregation (e.g., average per hour/day) if interval is specified.
+
+Returns JSON array of historical data points for charting.
+
+sources/voltmeters/route.ts:
+
+Handles GET requests from frontend to get all defined voltmeter_sources.
+
+Returns a list of vs_id, vs_name, vs_unit, vs_location, and vs_pins.
+
+sources/ammeters/route.ts:
+
+Handles GET requests from frontend to get all defined ammeter_sources.
+
+Returns a list of as_id, as_name, as_unit, as_location, and as_pins.
+
+lib/ directory:
+
+prisma.ts: Prisma client initialization.
+
+websocket.ts: Utility for managing socket.io server instance and emitting events.
+
+types.ts: TypeScript interfaces for all data structures (sensor readings, source definitions, minified API request body, full API request/response bodies).
+
+utils.ts: Helper functions (e.g., for date formatting, data aggregation).
+
+components/ directory:
+
+RealtimeSensorDisplay.tsx: Client component to display a single, real-time sensor value. Props: sourceId, sourceName, unit. Updates via WebSocketProvider context.
+
+HistoricalChart.tsx: Client component wrapper around react-chartjs-2. Props: chartTitle, sensorType (voltage/current), sourceId, timeRange. Fetches data from /api/data/history.
+
+SourceSelector.tsx: Client component to select which voltage/amp sources to display on charts.
+
+DateRangePicker.tsx: Client component for selecting historical date ranges.
+
+Navbar.tsx: Navigation between Dashboard, History, and Sources pages.
+
+WebSocketProvider.tsx: React Context provider to manage the socket.io client connection and provide socket.io instance to child components.
+
+SourceTable.tsx: Client or Server component to render a table of voltmeter_sources or ammeter_sources.
+
+prisma/ directory:
+
+schema.prisma: Defines the database schema as detailed in 3.1, with map attributes for table name underscores (e.g., @map("voltmeter_source")).
+
+seed.ts: Script to seed initial voltmeter_source and ammeter_source data (e.g., "Battery Voltage", "Solar Panel 1 Amps", "Total In Amps", "Total Out Amps") including placeholder location and pins.
+
+public/ directory:
+
+Any static assets (e.g., favicon).
+
+next.config.js:
+
+Basic Next.js configuration.
+
+server.ts (Custom Node.js Server - Required for socket.io):
+
+This file will be the entry point for the application when deployed.
+
+Initializes an HTTP server.
+
+Integrates socket.io with this HTTP server.
+
+Initializes the Next.js app and handles Next.js requests.
+
+Ensures that API Routes and WebSocket emissions can share the same underlying server instance and port.
+
+4. Development & Deployment Considerations:
+
+Dockerization: Provide Dockerfile and docker-compose.yml for easy self-hosting. This will containerize the Next.js application and the SQLite database (likely just mounting the database file).
+
+Environment Variables: Use .env files for sensitive information (database credentials, secrets, socket.io client URL).
+
+Error Handling & Logging: Robust server-side logging for API requests, database operations, and WebSocket events. Implement React Error Boundaries for frontend resilience.
+
+Timezone Handling: Crucial for historical data. Ensure consistent timezone management (preferably UTC for storage, then localized for display on the client).
+
+Prisma Migrations: Set up Prisma migrations for managing database schema changes.
+
+Okay, Co-Pilot, you have the complete and final detailed specification. I've incorporated all the latest feedback, including:
+
+The added location and pins columns to voltmeter_source and ammeter_source tables.
+
+All table names now use snake_case (e.g., voltmeter_source, current_reading) with @map in Prisma schema.
+
+A new app/sources/page.tsx for viewing the list of defined sources, along with its corresponding API routes.
+
+The minified JSON format for Arduino data ingestion.
+
+Your task is to build the foundational Next.js project based on this "Project Description: Self-Hosted Battery Monitor Web Application (Next.js Focus)", adhering strictly to the specified technologies, folder structure, and detailed feature breakdown.
+
+Key areas to focus on for initial setup:
+
+Next.js App Router Project Setup: Create a new Next.js project with TypeScript and integrate Tailwind CSS.
+
+Prisma and PostgreSQL:
+
+Set up Prisma (schema.prisma) with the defined voltmeter_source, ammeter_source, voltage_reading, and current_reading tables, including the specified column prefixes, UUIDs/auto-incrementing IDs, and the new location and pins fields with String? (nullable) types. Remember to use @map for table names. Configure Prisma to use the `sqlite` provider and define the `DATABASE_URL` environment variable.
+
+Include an initial prisma/seed.ts to populate a few voltmeter_source and ammeter_source entries (e.g., "Battery Voltage", "Solar Panel 1 Amps", "Total In Amps", "Total Out Amps") including placeholder location and pins values, so there's some data to work with.
+
+Create lib/prisma.ts for the Prisma client instance.
+
+Custom Server for WebSockets:
+
+Create a server.ts file at the root to handle both Next.js requests and socket.io WebSocket connections.
+
+Set up socket.io server-side in server.ts and provide a basic structure for lib/websocket.ts to emit events.
+
+API Routes:
+
+Implement app/api/sensor-data/route.ts to accept the minified JSON POST body from the Arduino, parse it, and save the data to the correct Prisma models (voltage_reading, current_reading). This route should also emit the latest readings via WebSocket.
+
+Implement app/api/data/history/route.ts with a basic GET handler (return empty array or mock data for now).
+
+Implement app/api/sources/voltmeters/route.ts and app/api/api/sources/ammeters/route.ts to fetch and return the respective source lists from the database using Prisma.
+
+Frontend Pages & Components:
+
+Set up app/layout.tsx with a WebSocketProvider (client component) that manages the socket.io-client connection.
+
+Create app/page.tsx (Dashboard) and app/history/page.tsx (Historical Data). Mark them as client components ('use client').
+
+Create app/sources/page.tsx to list the sources. This can be a Server Component initially.
+
+Include placeholder UI elements on app/page.tsx and app/history/page.tsx where sensor values and charts would appear.
+
+Include a placeholder table on app/sources/page.tsx to list the sources.
+
+TypeScript Types: Define interfaces in lib/types.ts for the minified Arduino payload, full sensor readings, and source definitions to ensure strong typing.

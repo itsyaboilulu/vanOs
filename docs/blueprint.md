@@ -6,7 +6,7 @@
 - Historical Data Visualization: Historical data visualization of voltage, current, and calculated battery level using interactive charts.
 - API Data Ingestion: API endpoint to ingest minified JSON data from an Arduino microcontroller.
 - Sensor Data Storage: Storage of voltage and current readings in a PostgreSQL database, optimized for time-series data.
-- Sensor Source Management: Web page for managing (listing) configured voltage and current sensor sources.
+- Sensor Data Storage: Storage of voltage and current readings in a SQLite database, optimized for time-series data.
 - Battery Health Optimization: AI-powered recommendations tool that analyze historical battery data to suggest optimal usage patterns for extending battery life.
 
 ## Style Guidelines:

@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model voltmeter_source {
+  vs_id       String            @id @default(uuid()) @map("vs_id")
+  vs_name     String            @unique @map("vs_name")
+  vs_unit     String            @default("V") @map("vs_unit")
+  vs_location String?           @map("vs_location")
+  vs_pins     String?           @map("vs_pins")
+  readings    voltage_reading[]
+
+  @@map("voltmeter_source")
+}
+
+model ammeter_source {
+  as_id       String           @id @default(uuid()) @map("as_id")
+  as_name     String           @unique @map("as_name")
+  as_unit     String           @default("A") @map("as_unit")
+  as_location String?          @map("as_location")
+  as_pins     String?          @map("as_pins")
+  readings    current_reading[]
+
+  @@map("ammeter_source")
+}
+
+model voltage_reading {
+  vr_id        Int              @id @default(autoincrement()) @map("vr_id")
+  vr_source_id String           @map("vr_source_id")
+  vr_timestamp DateTime         @default(now()) @map("vr_timestamp")
+  vr_value     Float            @map("vr_value")
+  source       voltmeter_source @relation(fields: [vr_source_id], references: [vs_id])
+
+  @@map("voltage_reading")
+}
+
+model current_reading {
+  cr_id        Int            @id @default(autoincrement()) @map("cr_id")
+  cr_source_id String         @map("cr_source_id")
+  cr_timestamp DateTime       @default(now()) @map("cr_timestamp")
+  cr_value     Float          @map("cr_value")
+  source       ammeter_source @relation(fields: [cr_source_id], references: [as_id])
+
+  @@map("current_reading")
+}
